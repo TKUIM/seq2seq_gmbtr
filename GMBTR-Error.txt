@@ -1,0 +1,24 @@
+---------------------------------------------------------------------------
+ValueError                                Traceback (most recent call last)
+<ipython-input-2-bdc1c405f223> in <module>()
+    156 kfold = StratifiedKFold(n_splits=10, shuffle=True, random_state=seed)
+    157 cvscores = []
+--> 158 for train, test in kfold.split(encoder_input_data, decoder_input_data):
+    159     # Fit the model
+    160     train_history=model.fit([encoder_input_data[train], decoder_input_data[train]], decoder_target_data,
+
+C:\Users\Yi-Heng Chiang\Anaconda3\lib\site-packages\sklearn\model_selection\_split.py in split(self, X, y, groups)
+    640             The testing set indices for that split.
+    641         """
+--> 642         y = check_array(y, ensure_2d=False, dtype=None)
+    643         return super(StratifiedKFold, self).split(X, y, groups)
+    644 
+
+C:\Users\Yi-Heng Chiang\Anaconda3\lib\site-packages\sklearn\utils\validation.py in check_array(array, accept_sparse, dtype, order, copy, force_all_finite, ensure_2d, allow_nd, ensure_min_samples, ensure_min_features, warn_on_dtype, estimator)
+    403         if not allow_nd and array.ndim >= 3:
+    404             raise ValueError("Found array with dim %d. %s expected <= 2."
+--> 405                              % (array.ndim, estimator_name))
+    406         if force_all_finite:
+    407             _assert_all_finite(array)
+
+ValueError: Found array with dim 3. Estimator expected <= 2.
