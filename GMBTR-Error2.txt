@@ -1,0 +1,31 @@
+--------------------------------------------------------------------------
+ValueError                                Traceback (most recent call last)
+<ipython-input-21-0a7884b0a00b> in <module>()
+    183 detrain, detest = train_test_split(decoder_input_data, test_size=0.1)
+    184 train_history=model.fit([encoder_input_data[len(entrain)], decoder_input_data[len(detrain)]], decoder_target_data, 
+--> 185                         epochs=epochs, batch_size=batch_size, verbose=0)
+    186 #    train_history=model.fit(encoder_input_data[train], decoder_input_data[train],
+    187 #                            epochs=epochs, batch_size=batch_size, verbose=0)
+
+C:\Users\Yi-Heng Chiang\Anaconda3\lib\site-packages\keras\engine\training.py in fit(self, x, y, batch_size, epochs, verbose, callbacks, validation_split, validation_data, shuffle, class_weight, sample_weight, initial_epoch, steps_per_epoch, validation_steps, **kwargs)
+   1591             class_weight=class_weight,
+   1592             check_batch_axis=False,
+-> 1593             batch_size=batch_size)
+   1594         # Prepare validation data.
+   1595         do_validation = False
+
+C:\Users\Yi-Heng Chiang\Anaconda3\lib\site-packages\keras\engine\training.py in _standardize_user_data(self, x, y, sample_weight, class_weight, check_batch_axis, batch_size)
+   1424                                     self._feed_input_shapes,
+   1425                                     check_batch_axis=False,
+-> 1426                                     exception_prefix='input')
+   1427         y = _standardize_input_data(y, self._feed_output_names,
+   1428                                     output_shapes,
+
+C:\Users\Yi-Heng Chiang\Anaconda3\lib\site-packages\keras\engine\training.py in _standardize_input_data(data, names, shapes, check_batch_axis, exception_prefix)
+    108                         ': expected ' + names[i] + ' to have ' +
+    109                         str(len(shape)) + ' dimensions, but got array '
+--> 110                         'with shape ' + str(data_shape))
+    111                 if not check_batch_axis:
+    112                     data_shape = data_shape[1:]
+
+ValueError: Error when checking input: expected input_41 to have 3 dimensions, but got array with shape (14, 689)
