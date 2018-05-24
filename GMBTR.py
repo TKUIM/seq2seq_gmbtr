@@ -5,28 +5,14 @@ from keras.models import Model
 from keras.layers import Input, LSTM, Dense
 from sklearn.model_selection import StratifiedKFold
 import numpy as np
+from sklearn.model_selection import train_test_split
 
-'''
-sys.setrecursionlimit(1000000)
-# set parameters:
-vocab_dim = 100# word2vec size ：訓練出的詞向量會有幾維
-maxlen = 100
-n_iterations = 1  # ideally more..
-n_exposures = 10
-window_size = 5
-batch_size = 32
-# n_epoch = 500
-n_epoch = 100
-# n_epoch = 5
-input_length = 100
-cpu_count = multiprocessing.cpu_count()
-'''
-
+# 64 -> 32
 batch_size = 100  # 訓練時每批次樣本數 Batch size for training.
 # 100 -> 150
 # 200 overfitting
 # 0.2 (150-200) / cv 0.1 (180-200)
-epochs = 180  # 期數，訓練幾輪完整資料 Number of epochs to train for.
+epochs = 100  # 期數，訓練幾輪完整資料 Number of epochs to train for.
 # 256 -> 128
 latent_dim = 100  # 維度 Latent dimensionality of the encoding space.
 # 10000 -> 1000
@@ -37,7 +23,7 @@ validation_cross_split =0.1  # 驗證比例
 validation_fold = 10
 
 # 資料集的路徑
-data_path = 'test/CCtoSC.txt'
+data_path = 'D:/Paper/SCtoCC.txt'#'test/CCtoSC.txt'
 # CCtoSC SCtoCC
 # test/ CCtoSC_clean.txt SCtoCC_clean.txt
 
@@ -46,20 +32,28 @@ input_texts = []
 target_texts = []
 input_characters = set()
 target_characters = set()
-with open(data_path, 'r', encoding='utf-8') as f:
+stop = set([' ', '\t'])
+with open(data_path, 'r', encoding='utf-8-sig') as f:
     lines = f.read().split('\n')
-for line in lines[: min(num_samples, len(lines) - 1)]:
+for line in lines[: min(num_samples, len(lines))]:
     input_text, target_text = line.split('\t')
     # 以 Tab 分隔，前為輸入，後為輸出，以斷行 \n 分句。
     target_text = '\t' + target_text + '\n'
     input_texts.append(input_text)
     target_texts.append(target_text)
     for char in input_text:
+        if char in stop:#== ' ': #or char == u'\ufeff'
+            continue
         if char not in input_characters:
             input_characters.add(char)
     for char in target_text:
+        if char in stop:
+            continue
         if char not in target_characters:
             target_characters.add(char)
+#print(lines)
+print(input_characters)
+print(target_characters)
 
 # 處理相關數據
 input_characters = sorted(list(input_characters))
@@ -76,7 +70,7 @@ print('Number of unique output tokens:', num_decoder_tokens)
 print('Max sequence length for inputs:', max_encoder_seq_length)
 print('Max sequence length for outputs:', max_decoder_seq_length)
 
-'''
+
 # One-hot向量
 input_token_index = dict([(char, i) for i, char in enumerate(input_characters)])
 target_token_index = dict([(char, i) for i, char in enumerate(target_characters)])
@@ -89,16 +83,25 @@ decoder_target_data = np.zeros(
     (len(input_texts), max_decoder_seq_length, num_decoder_tokens), dtype='float32')
 
 for i, (input_text, target_text) in enumerate(zip(input_texts, target_texts)):
+    enIndex = 0
     for t, char in enumerate(input_text):
-        encoder_input_data[i, t, input_token_index[char]] = 1.
+        if char == ' ': continue
+        encoder_input_data[i, enIndex, input_token_index[char]] = 1.
+        enIndex = enIndex + 1
+    
+    deIndex = 0
     for t, char in enumerate(target_text):
         # decoder_target_data is ahead of decoder_input_data by one timestep
-        decoder_input_data[i, t, target_token_index[char]] = 1.
-        if t > 0:
+        if char in stop: continue
+        decoder_input_data[i, deIndex, target_token_index[char]] = 1.
+        deIndex = deIndex + 1
+        
+        #decoder_input_data[i, t, target_token_index[char]] = 1.
+        if deIndex > 0:
             # decoder_target_data will be ahead by one timestep
             # and will not include the start character.
-            decoder_target_data[i, t - 1, target_token_index[char]] = 1.
-'''
+            decoder_target_data[i, deIndex - 1, target_token_index[char]] = 1.
+
 
 # Define an input sequence and process it.
 encoder_inputs = Input(shape=(None, num_encoder_tokens))
@@ -151,20 +154,23 @@ def split_fold(s, n):
 seed = 16313
 #numpy.random.seed(seed)
 
-# define 10-fold cross validation test harness
-kfold = StratifiedKFold(n_splits=10, shuffle=True, random_state=seed)
-cvscores = []
-for train, test in kfold.split(encoder_input_data, decoder_input_data):
-    # Fit the model
-    train_history=model.fit([encoder_input_data[train], decoder_input_data[train]], decoder_target_data,
-                            epochs=epochs, batch_size=batch_size, verbose=0)
+#cvscores = []
+#train_test_split(y,shuffle=true,test_size=0.1)
+
+
+entrain, entest, detrain, detest, target_train, target_test = train_test_split(encoder_input_data, 
+                                                                               decoder_input_data, 
+                                                                               decoder_target_data, test_size=0.1)
+
+train_history=model.fit([entrain, detrain], target_train, 
+                        epochs=epochs, batch_size=batch_size, verbose=1)
+
+
 #    train_history=model.fit(encoder_input_data[train], decoder_input_data[train], 
 #                            epochs=epochs, batch_size=batch_size, verbose=0)
-    # evaluate the model
-    scores = model.evaluate([encoder_input_data[test], decoder_input_data[test]], verbose=0)
-    print("%s: %.2f%%" % (model.metrics_names[1], scores[1]*100))
-    cvscores.append(scores[1] * 100)
-print("%.2f%% (+/- %.2f%%)" % (numpy.mean(cvscores), numpy.std(cvscores)))
+#scores = model.evaluate([entest, detest], verbose=1)
+#print("%s: %.2f%%" % (model.metrics_names[1], scores[1]*100))
+#cvscores.append(scores[1] * 100)
 
 # 儲存模型
 model.save('s2s.h5')
@@ -195,7 +201,7 @@ def decode_sequence(input_seq):
     # Generate empty target sequence of length 1.
     target_seq = np.zeros((1, 1, num_decoder_tokens))
     # Populate the first character of target sequence with the start character.
-    target_seq[0, 0, target_token_index['\t']] = 1.
+#    target_seq[0, 0, target_token_index['\t']] = 1.
 
     # Sampling loop for a batch of sequences
     # (to simplify, here we assume a batch of size 1).
@@ -205,7 +211,7 @@ def decode_sequence(input_seq):
         output_tokens, h, c = decoder_model.predict([target_seq] + states_value)
 
         # Sample a token
-        sampled_token_index = np.argmax(output_tokens[0, -1, :])
+        sampled_token_index = np.argmax(output_tokens[0, -1, :]) #####
         sampled_char = reverse_target_char_index[sampled_token_index]
         decoded_sentence += sampled_char
 
@@ -223,6 +229,22 @@ def decode_sequence(input_seq):
         states_value = [h, c]
 
     return decoded_sentence
+
+'''
+sys.setrecursionlimit(1000000)
+# set parameters:
+vocab_dim = 100# word2vec size ：訓練出的詞向量會有幾維
+maxlen = 100
+n_iterations = 1  # ideally more..
+n_exposures = 10
+window_size = 5
+batch_size = 32
+# n_epoch = 500
+n_epoch = 100
+# n_epoch = 5
+input_length = 100
+cpu_count = multiprocessing.cpu_count()
+'''
 
 #建立詞典，Return每個詞的索引、詞向量，以及每個語句所對應的詞語索引。
 def create_dictionaries(model=None,combined=None):
@@ -271,3 +293,119 @@ def get_data(index_dict,word_vectors,combined,y):
     x_train, x_test, y_train, y_test = train_test_split(combined, y, test_size=0.1)
     print (x_train.shape,y_train.shape)
     return n_symbols,embedding_weights,x_train,y_train,x_test,y_test
+
+###
+print(encoder_input_data.shape)
+print(decoder_input_data.shape)
+
+print(entrain.shape, entest.shape, detrain.shape, detest.shape)
+print(target_train.shape)
+###
+
+# 前指定筆數
+#for i in range(len(LIST_NAME)):
+#for i, LIST_NAME in enumerate(LIST_NAME):
+for seq_index in range(10): #對新測試集重做
+    # Take one sequence (part of the training set)
+    # for trying out decoding.
+    input_seq = encoder_input_data[seq_index: seq_index + 1]#seq_index: seq_index + 1
+    decoded_sentence = decode_sequence(input_seq)
+    #print('-')
+    #print('Input sentence:', input_texts[seq_index].replace(' ', ''))
+    #print('Decoded sentence:', decoded_sentence.replace(' ', ''))
+    
+    print('Input sentence:', input_texts[seq_index])
+    print('Decoded sentence:', decoded_sentence)
+###
+
+# 隨機挑選
+import random
+for seq_index in range(10):
+    ran = random.randrange(0, len(input_texts))
+    input_seq = encoder_input_data[ran: ran+1]
+    decoded_sentence = decode_sequence(input_seq)
+    #print('-')
+    print('Input sentence:', input_texts[ran].replace(' ', ''))
+    print('Decoded sentence:', decoded_sentence.replace(' ', ''))
+###
+
+# 指定輸入
+#while True:
+try:
+    input_seq = decode_sequence(input())
+    #query = input_texts.index(input())
+    #input_seq = encoder_input_data[query: query+1]
+        #print(input_seq)
+        #input_seq = input()
+    decoded_sentence = decode_sequence(input_seq)
+    print('Input sentence:', input_texts[query].replace(' ', ''))
+    print('Decoded sentence:', decoded_sentence.replace(' ', ''))
+except Exception as e:
+    print(repr(e))
+###
+
+# 檢視資料
+'''
+r    讀取(檔案需存在)
+w    新建檔案寫入(檔案可不存在，若存在則清空)
+a    資料附加到舊檔案後面(游標指在EOF)
+r+   讀取舊資料並寫入(檔案需存在且游標指在開頭)
+w+   清空檔案內容，新寫入的東西可在讀出(檔案可不存在，會自行新增)
+a+   資料附加到舊檔案後面(游標指在EOF)，可讀取資料
+b    二進位模式
+'''
+
+# f = open('newdata_clean.txt', 'r', encoding='utf-8')
+# 指定輸出全檔 筆數為行數
+#for i in range(len(LIST_NAME)):
+#for i, LIST_NAME in enumerate(LIST_NAME):
+#for seq_index in range(10):
+for seq_index in range(len(encoder_input_data)):
+    input_seq = encoder_input_data[seq_index: seq_index + 1]
+    decoded_sentence = decode_sequence(input_seq)
+    #print('-')
+    print('Input sentence:', input_texts[seq_index].replace(' ', ''))
+    print('Decoded sentence:', decoded_sentence.replace(' ', ''))
+###
+
+# 輸出訓練結果
+import re
+
+#data_path = 'newdata_clean.txt'
+data_file = open(data_path, encoding='utf-8') 
+line_cnt = len(data_file.readlines())
+input_texts = []
+target_texts = []
+ref_classical = []
+can_trained = []
+
+with open('test/train_result.txt', 'w', encoding='utf-8') as f:
+    for seq_index in range(len(encoder_input_data)):
+        input_seq = encoder_input_data[seq_index: seq_index + 1]
+        decoded_sentence = decode_sequence(input_seq)
+        decoded_sentence = re.sub(' +', ' ', decoded_sentence)
+        decoded_sentence = re.sub('^ ', '', decoded_sentence)
+        decoded_sentence = re.sub(' $', '', decoded_sentence)
+        #decoded_sentence = re.sub(' \n', '', decoded_sentence)
+        f.write(decoded_sentence)
+        #ref_classical.append(input_texts[seq_index])
+        can_trained.append(decoded_sentence)
+        f.flush()
+    #print(ref_classical)
+    print(can_trained)
+###
+%matplotlib inline
+import matplotlib.pyplot as plt
+#print(train_history)
+def show_train_history(train_history,train,validation):
+    plt.plot(train_history.history[train])
+    plt.plot(train_history.history[validation])
+    plt.title('Train History')
+    plt.ylabel(train)
+    plt.xlabel('Epoch')
+    plt.legend(['train','validation'],loc='upper left')
+    plt.show()
+#plt.savefig("filename.png",dpi=300,format="png")
+###
+show_train_history(train_history,'acc','val_acc')
+###
